@@ -21,7 +21,7 @@ using std::vector;
 // KaHIP
 #include "graph_io.h"
 
-bool debug = false;
+//bool debug = false;
 
 size_t apply_rule_one(ECCGraph const& graph, Cover& cover, size_t const component = 0) {
     size_t ret = 0;
@@ -97,29 +97,29 @@ size_t apply_rule_two(ECCGraph const& graph, Cover& cover, size_t const componen
             common_neighbors.insert(v1);
             common_neighbors.insert(v2);
 
-            debug = (v1 == 790094 and v2 == 53775) or (v1 == 53775 and v2 == 790094);
+            //debug = (v1 == 790094 and v2 == 53775) or (v1 == 53775 and v2 == 790094);
 
-            if (debug) {
-                std::cout << "common neighbors of 15 and 45968 = ";
-                for (auto v : common_neighbors) {
-                    std::cout << " " << v;
-                }
-                std::cout << std::endl;
-            }
+////            if (debug) {
+////                std::cout << "common neighbors of 15 and 45968 = ";
+////                for (auto v : common_neighbors) {
+////                    std::cout << " " << v;
+////                }
+////                std::cout << std::endl;
+////            }
 
             if (is_clique(graph, cover, common_neighbors)) {
-                if (debug) {
-                    std::cout << "    is a clique!" << std::endl;
-                }
+////                if (debug) {
+////                    std::cout << "    is a clique!" << std::endl;
+////                }
                 cover.cover_clique(common_neighbors);
                 // std::cout << "Rule 2 is adding the clique ";
                 // for (auto const& n : common_neighbors) std::cout << n << " ";
                 // std::cout << "based on edge " << v1 << " " << v2 << "\n";
                 ret++;
             } else {
-                if (debug) {
-                    std::cout << "    is not a clique!" << std::endl;
-                }
+////                if (debug) {
+////                    std::cout << "    is not a clique!" << std::endl;
+////                }
             }
 ////            if (vertex_count % 100000 == 0) {
 ////                std::cerr << "(R2)Edges: " << graph.e << " -> ";

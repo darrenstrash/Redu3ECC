@@ -387,8 +387,7 @@ int main(int argn, char **argv) {
         std::vector<unsigned int> dom_degree;
         dom_degree.assign(vcc_adjlist.size(), 0);
         reducer R;
-        R.bruteD2(reduVCC);
-        //R.exhaustive_reductions(reduVCC, iso_degree, dom_degree);
+        R.exhaustive_reductions(reduVCC, iso_degree, dom_degree);
 
         double vcc_reduction_time = reduce_timer.elapsed();
         std::cout << "BEGIN_OUTPUT_FOR_TABLES" << std::endl;

@@ -88,7 +88,7 @@ void reducer::bruteD2(redu_vcc &reduVCC) {
           if (!reduVCC.node_status[v]) { continue;}
 
           if (d2_reduction::validD2(reduVCC, v)){
-            std::cout << "performed D2 fold!" << std::endl;
+              //std::cout << "performed D2 fold!" << std::endl;
 
               vertexReduced = true;
               reduction *pReduction = nullptr;

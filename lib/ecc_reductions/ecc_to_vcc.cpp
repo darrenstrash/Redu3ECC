@@ -48,8 +48,7 @@ vector<vector<NodeID>> ECC2VCC::compute_ecc_adjlist(std::unordered_set<std::pair
         kernel_vertices++;
 
         if (to_new_id.find(v1) == to_new_id.end()) {
-            if (new_id == 15 or new_id == 45968)
-                std::cout << v1 << " -> " << new_id << std::endl;
+            //std::cout << v1 << " -> " << new_id << std::endl;
             to_new_id[v1] = new_id++;
         }
 
@@ -60,8 +59,7 @@ vector<vector<NodeID>> ECC2VCC::compute_ecc_adjlist(std::unordered_set<std::pair
 
             // TODO: move below ifs, only for testing
             if (to_new_id.find(v2) == to_new_id.end()) {
-                if (new_id == 15 or new_id == 45968)
-                    std::cout << v2 << " -> " << new_id << std::endl;
+                //std::cout << v2 << " -> " << new_id << std::endl;
                 to_new_id[v2] = new_id++;
             }
 
@@ -127,16 +125,16 @@ vector<vector<NodeID>> ECC2VCC::compute_vcc_adjlist(
         }**/);
 
     std::pair<NodeID, NodeID> debug_edge;
-    bool debug = false;
+////    bool debug = false;
 
     for (auto edge : uncovered_list) {
         if (get<0>(edge) < get<1>(edge)) {
             last_uncovered_id = new_id;
-            if (new_id == 676) {
-                debug = true;
-                debug_edge = edge;
-                std::cout << "(" << get<0>(edge) << ", " << get<1>(edge) << ") -> " << new_id << std::endl;
-            }
+////            if (new_id == 676) {
+////                debug = true;
+////                debug_edge = edge;
+////                std::cout << "(" << get<0>(edge) << ", " << get<1>(edge) << ") -> " << new_id << std::endl;
+////            }
             ids[edge] = new_id++;
         }
     }
@@ -149,11 +147,11 @@ vector<vector<NodeID>> ECC2VCC::compute_vcc_adjlist(
         sort(ecc_copy[u].begin(), ecc_copy[u].end());
         for (auto neighbor : ecc_copy[u]) {
             if (u < neighbor and uncovered.find(std::make_pair(u, neighbor)) == uncovered.end()) {
-                if (new_id == 676) {
-                    debug = true;
-                    debug_edge = std::make_pair(u, neighbor);
-                    std::cout << "(" << u << ", " << neighbor << ") -> " << new_id << std::endl;
-                }
+////                if (new_id == 676) {
+////                    debug = true;
+////                    debug_edge = std::make_pair(u, neighbor);
+////                    std::cout << "(" << u << ", " << neighbor << ") -> " << new_id << std::endl;
+////                }
                 ids[std::make_pair(u, neighbor)] = new_id++;
             }
         }
