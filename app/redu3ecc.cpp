@@ -691,6 +691,9 @@ int main(int argn, char **argv) {
         //std::cout << "input_graph_edges=" << G.number_of_edges() / 2 << std::endl;
         //std::cout << "total_time_to_best=" << time_to_solution << std::endl;
         std::cout << "vcc_reduction_time=" << vcc_reduction_time << std::endl;
+        cout << "vcc_kernel_vertices=" << to_string(reduVCC.remaining_nodes) << endl;
+        reduVCC.buildKernel();
+        cout << "vcc_kernel_edges=" << to_string(reduVCC.kernel_edges / 2) << endl;
         std::cout << "clique_enumeration_time=" << clique_enumeration_time << std::endl;
         std::cout << "ilp_solver_setup_time=" << ilp_solver_setup_time << std::endl;
         std::cout << "ilp_solver_time=" << ilp_solver_time << std::endl;
