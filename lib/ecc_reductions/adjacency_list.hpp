@@ -1,10 +1,16 @@
 #pragma once
 
 #include <unordered_map>
+#include <unordered_set>
 #include <cstdint>
 #include <vector>
 
 typedef uint32_t node_t; // I might eventually need more than 4 billion nodes...
+
+////struct NodePairHash2 {
+////    size_t operator()(std::pair<uint32_t, uint32_t> const& p) const;
+////};
+
 
 class NodeVector : public std::vector<node_t> {
 public:
@@ -27,4 +33,7 @@ public:
     bool has_edge(node_t, node_t) const;
     bool has_node(node_t) const;
     node_container_t const& neighbors(node_t) const;
+
+////private:
+////    std::unordered_set<std::pair<node_t, node_t>, NodePairHash2> edges;
 };

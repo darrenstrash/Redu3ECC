@@ -68,17 +68,66 @@ size_t apply_rule_one(ECCGraph const& graph, Cover& cover, size_t const componen
 }
 
 void compute_common_neighbors(ECCGraph const& graph, Cover const& cover, node_t v1, node_t v2, node_container_t& output) {
+    // if the neighborhoods never change, can do this 2x faster.
+    static vector<bool> indicator(graph.n, false);
+
+    for (node_t neighbor : graph.neighbors(v1)) {
+        if (cover.is_removed(neighbor) or neighbor == v2) continue; // not needed here
+        indicator[neighbor] = true;
+    }
+
     // Assumes nodes contains only valid nodes (not removed)
+    for (node_t neighbor : graph.neighbors(v2)) {
+        if (cover.is_removed(neighbor) or neighbor == v1) continue;
+        if (indicator[neighbor]) output.insert(neighbor);
+    }
 
     for (node_t neighbor : graph.neighbors(v1)) {
         if (cover.is_removed(neighbor) or neighbor == v2) continue;
-        if (graph.has_edge(v2, neighbor)) {
-            output.insert(neighbor);
-        }
+        indicator[neighbor] = false;
     }
 }
 
 bool is_clique(ECCGraph const& graph, Cover const& cover, node_container_t const& nodes) {
+    if (nodes.empty() or nodes.size() == 1) return true;
+    // Assumes nodes contains only valid nodes (not removed)
+    static vector<bool> indicator(graph.n, false);
+
+    // if graph in degeneracy order, can do this much faster.
+    size_t should_hit = 0;
+    for (auto node : nodes) {
+        if (cover.is_removed(node)) continue;
+        indicator[node] = true;
+        should_hit++;
+    }
+    if (should_hit == 0) {
+        for (auto node : nodes) {
+            indicator[node] = false;
+        }
+        return true;
+    }
+
+    should_hit--;
+
+    bool valid = true;
+    for (auto node : nodes) {
+        if (cover.is_removed(node)) continue;
+        size_t did_hit = 0;
+        for (auto neigh : graph.neighbors(node)) {
+            if (indicator[neigh] && ++did_hit == should_hit) break;
+        }
+        if (did_hit != should_hit) { 
+            valid = false;
+            break;
+        }
+    }
+
+    for (auto node : nodes) {
+        indicator[node] = false;
+    }
+
+    return valid;
+
     for (auto it1 = nodes.cbegin(); it1 != nodes.cend(); it1++) {
         if (cover.is_removed(*it1)) continue;
         for (auto it2 = std::next(it1, 1); it2 != nodes.cend(); it2++) {

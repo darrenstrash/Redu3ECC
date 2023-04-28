@@ -4,6 +4,9 @@
 #include <cstddef>
 using std::size_t;
 
+// for hashing
+#include <boost/functional/hash.hpp>
+
 #include "cover.hpp"
 #include "graph.hpp"
 #include "adjacency_list.hpp"
@@ -11,7 +14,12 @@ using std::size_t;
 size_t NodePairHash::operator()(std::pair<uint32_t, uint32_t> const& p) const {
     // Ensure that size_t, the type of the hash, is large enough
     // assert(sizeof(size_t) >= sizeof(uint32_t) * 2); // It usually is
-    return (((size_t)p.first) << sizeof(uint32_t)) | (size_t)p.second;
+    //return (((size_t)p.first) << sizeof(uint32_t)) | (size_t)p.second;
+    //DS: a real hash function
+    size_t seed = 0;
+    boost::hash_combine(seed, std::get<0>(p));
+    boost::hash_combine(seed, std::get<1>(p));
+    return seed;
 }
 
 Cover::Cover() {
