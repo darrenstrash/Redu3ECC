@@ -2,6 +2,7 @@
 #include <sstream>
 #include <string>
 #include <istream>
+#include <unordered_map>
 
 #include "graph.hpp"
 #include "adjacency_list.hpp"
@@ -16,6 +17,9 @@ ECCGraph::ECCGraph(std::istream& is) {
 
     n = 0;
     e = 0;
+
+    std::unordered_map<node_t, node_t> old_to_new;
+    node_t new_id = 0;
 
     std::string line;
     while (std::getline(is, line)) {
@@ -43,6 +47,14 @@ ECCGraph::ECCGraph(std::istream& is) {
         node_t v2;
         iss >> v2;
         if (v1 == v2) continue; // We don't deal with loops
+
+        if (old_to_new.find(v1) == old_to_new.end())
+            old_to_new[v1] = new_id++;
+        if (old_to_new.find(v2) == old_to_new.end())
+            old_to_new[v2] = new_id++;
+
+        v1 = old_to_new[v1];
+        v2 = old_to_new[v2];
 
         if (not has_node(v1)) {
             add_node(v1);

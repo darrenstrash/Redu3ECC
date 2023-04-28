@@ -687,9 +687,9 @@ vector<int> Tools::ReadMetisOrdering(string const &fileName)
 ////if (debug)        cout << endl << flush;
     }
 
-#ifdef DEBUG
-    printArrayOfLinkedLists(adjList, n);
-#endif
+////#ifdef DEBUG
+////    printArrayOfLinkedLists(adjList, n);
+////#endif
 
     return ordering;
 }

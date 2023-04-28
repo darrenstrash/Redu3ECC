@@ -217,9 +217,9 @@ int computeDegeneracy(vector<vector<int>> const &adjList, int size)
 NeighborList** computeDegeneracyOrderList(vector<list<int>> const &adjList, int size)
 {
 
-#ifdef DEBUG
-    printf("degeneracy is %d\n", computeDegeneracy(list, size));
-#endif
+////#ifdef DEBUG
+////    printf("degeneracy is %d\n", computeDegeneracy(list, size));
+////#endif
 
     NeighborList** ordering = (NeighborList**)Calloc(size, sizeof(NeighborList*));
 

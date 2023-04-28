@@ -21,31 +21,39 @@ using std::vector;
 // KaHIP
 #include "graph_io.h"
 
-//bool debug = false;
+bool debug = false;
 
 size_t apply_rule_one(ECCGraph const& graph, Cover& cover, size_t const component = 0) {
+    //std::cout << "Applying rule 1" << std::endl;
     size_t ret = 0;
 
     size_t vertex_count = 0;
 
     for (auto const& [v1, v1_neighbors] : graph.get_adj_list()) {
+////        if (debug) std::cout << "Checking vertex v1=" << v1 << ", graph.n=" << graph.n << std::endl;
         if (cover.is_removed(v1) or (component != 0 and cover.components[v1] != component)) continue;
         vertex_count++;
 
         bool all_edges_covered = true;
         for (node_t v2 : v1_neighbors) {
+////            if (debug) std::cout << "asking if neighbor v2=" << v2 << " is removed" << std::endl;
             if (cover.is_removed(v2)) continue;
 
+////            if (debug) std::cout << "checking if edge (v1,v2)=(" << v1 << "," << v2 << ") is covered" << std::endl;
             if (not cover.is_covered(v1, v2)) {
                 all_edges_covered = false;
                 break;
             }
         }
+////        if (debug) std::cout << "all_edges_covered=" << all_edges_covered;
 
         if (all_edges_covered) {
+////            if(debug) std::cout << "removing v1=" << v1 << std::endl;
             cover.remove_node(v1);
+////            if(debug) std::cout << "...and covering its edges" << std::endl;
             //std::cout << "Rule 1 is removing " << v1 << "\n";
             for (node_t neighbor : graph.neighbors(v1)) {
+////                if (debug) std::cout << "covering (neighbor, v1)=(" << neighbor << "," << v1 << ")" << std::endl;
                 cover.cover_edge(neighbor, v1);
             }
             ret++;
@@ -83,6 +91,8 @@ bool is_clique(ECCGraph const& graph, Cover const& cover, node_container_t const
 }
 
 size_t apply_rule_two(ECCGraph const& graph, Cover& cover, size_t const component = 0) {
+
+    //std::cout << "Applying rule 2" << std::endl;
     size_t ret = 0;
     size_t vertex_count = 0;
 
@@ -365,6 +375,7 @@ void apply_reductions(ECCGraph const& graph, Cover& cover, bool one_enabled, boo
         // if (need_to_compute_connected_components) {
         //     compute_connected_components(graph, cover);
         // }
+        std::cout << "Done with reductions" << std::endl;
         return;
     }
 }
