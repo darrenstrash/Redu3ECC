@@ -420,7 +420,7 @@ int main(int argn, char **argv) {
       std::cout << "branch_count=" << to_string(B.branch_count) << std::endl;
       std::cout << "prune_count=" << to_string(B.prune_count) << endl;
       std::cout << "decompose_count=" << to_string(B.decompose_count) << std::endl;
-      std::cout << "total_solution=" << to_string(reduVCC.clique_cover.size()) << std::endl;
+      std::cout << "total_solution=" << to_string(cover.cliques.size() + reduVCC.clique_cover.size()) << std::endl;
 
       make_graph_access(vcc_adjlist, G);
 
