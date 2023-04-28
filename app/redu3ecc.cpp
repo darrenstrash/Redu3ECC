@@ -336,10 +336,9 @@ int main(int argn, char **argv) {
     bool const RULE_FOUR_ENABLED = false;
 
     ECCGraph graph = ECCGraph(std::cin);
-    std::cerr << "Done reading in graph.\n";
+    //std::cerr << "Done reading in graph.\n";
 
     timer total_timer;
-    timer s;
     Cover cover = Cover(graph.n);
 
     std::string const basename = ""; //argv[1];
@@ -349,8 +348,11 @@ int main(int argn, char **argv) {
 
     size_t total_calls = 0;
 
-    std::cerr << "input_vertices=" << graph.n << std::endl;
-    std::cerr << "input_edges=" << graph.e / 2 << std::endl;
+    std::cout.setf( std::ios::fixed, std:: ios::floatfield );
+    std::cout.precision(4);
+
+    std::cout << "input_vertices=" << to_string(graph.n) << std::endl;
+    std::cout << "input_edges=" << to_string(graph.e / 2) << std::endl;
 
     auto const start_ecc_reductions = std::chrono::high_resolution_clock::now();
     auto const start = start_ecc_reductions;
@@ -360,10 +362,8 @@ int main(int argn, char **argv) {
     auto const end_ecc_reductions = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> const ecc_reduction_time = end_ecc_reductions- start_ecc_reductions;
 
-    std::cerr << "ecc_reduction_time=" << ecc_reduction_time.count() / 1000.0 << std::endl;
-    std::cerr << "ecc_reduction_offset=" << cover.cliques.size() << std::endl;
-    std::cerr << "input_vertices=" << graph.n << std::endl;
-    std::cerr << "input_edges=" << graph.e / 2 << std::endl;
+    std::cout << "ecc_reduction_time=" << ecc_reduction_time.count() / 1000.0 << std::endl;
+    std::cout << "ecc_reduction_offset=" << to_string(cover.cliques.size()) << std::endl;
 
     // convert to vcc
     auto const start_convert = std::chrono::high_resolution_clock::now();
@@ -372,7 +372,7 @@ int main(int argn, char **argv) {
     auto const end_convert = std::chrono::high_resolution_clock::now();
 
     std::chrono::duration<double, std::milli> const time_to_convert = end_convert - start_convert;
-    std::cerr << "time_ecc_to_vcc=" << time_to_convert.count() / 1000.0 << std::endl;
+    std::cout << "time_ecc_to_vcc=" << time_to_convert.count() / 1000.0 << std::endl;
 
     graph_access G;
     timer t;
@@ -396,33 +396,73 @@ int main(int argn, char **argv) {
 
         //reduVCC.analyzeGraph(graph_filename, G, s, false /* don't check cover */);
 
-        cout << "vcc_reduction_offset=" << R.get_cover_size_offset() << endl;
-        cout << "vcc_kernel_vertices=" << reduVCC.remaining_nodes << endl;
+        cout << "vcc_reduction_offset=" << to_string(R.get_cover_size_offset()) << endl;
+        cout << "vcc_kernel_vertices=" << to_string(reduVCC.remaining_nodes) << endl;
         reduVCC.buildKernel();
-        cout << "vcc_kernel_edges=" << reduVCC.kernel_edges / 2 << endl;
-    } else if (partition_config.run_type == "ReduIG") {
-        redu_vcc reduVCC(vcc_adjlist);
+        cout << "vcc_kernel_edges=" << to_string(reduVCC.kernel_edges / 2) << endl;
+    } else if (partition_config.run_type == "ReduBNR") {
+      redu_vcc reduVCC;
+      branch_and_reduce B(vcc_adjlist, reduVCC, partition_config);
 
+      vertex_queue *queue = nullptr;
+      if (partition_config.redu_type == "cascading") queue = new vertex_queue(reduVCC);
+
+      timer s;
+      bool const finished = B.bandr(reduVCC, 0, queue, partition_config, total_timer);
+      double bandr_time = s.elapsed();
+      double total_time = total_timer.elapsed();
+      //B.analyzeGraph(graph_filename, G, reduVCC, s);
+
+      std::cout << "BEGIN_OUTPUT_FOR_TABLES" << std::endl;
+      std::cout << "run_type=" << partition_config.run_type << std::endl;
+      std::cout << "bnr_time=" << bandr_time << std::endl;
+      std::cout << "total_time=" << total_time << std::endl;
+      std::cout << "branch_count=" << to_string(B.branch_count) << std::endl;
+      std::cout << "prune_count=" << to_string(B.prune_count) << endl;
+      std::cout << "decompose_count=" << to_string(B.decompose_count) << std::endl;
+      std::cout << "total_solution=" << to_string(reduVCC.clique_cover.size()) << std::endl;
+
+      make_graph_access(vcc_adjlist, G);
+
+      std::cout << "verified_cover=" << (reduVCC.validateCover(G) ? "passed" : "failed") << std::endl;
+      std::cout << "optimal=" << (finished ? "yes" : "unknown") << std::endl;
+
+      return 0;
+    } else if (partition_config.run_type == "ReduIG") {
+        timer reduce_timer;
+        redu_vcc reduVCC(vcc_adjlist);
         std::vector<unsigned int> iso_degree;
         iso_degree.assign(vcc_adjlist.size(), 0);
         std::vector<unsigned int> dom_degree;
         dom_degree.assign(vcc_adjlist.size(), 0);
         reducer R;
         R.exhaustive_reductions(reduVCC, iso_degree, dom_degree);
+        double const vcc_reduction_time = reduce_timer.elapsed();
 
         reduVCC.build_cover();
         double time_to_solution = 0.0;
-        reduVCC.solveKernel(partition_config, s, time_to_solution, cover.cliques.size() + R.get_cover_size_offset() /* clique cover offset */);
+        double time_without_ig = total_timer.elapsed();
+        reduVCC.solveKernel(partition_config, total_timer, time_to_solution, cover.cliques.size() + R.get_cover_size_offset() /* clique cover offset */);
         //reduVCC.analyzeGraph(graph_filename, G, s, false /* don't check cover */);
 
+        timer unwind_timer;
         R.unwindReductions(reduVCC, time_to_solution);
+        double time_to_unwind = unwind_timer.elapsed();
+        double total_time = total_timer.elapsed();
 
         std::cout << "BEGIN_OUTPUT_FOR_TABLES" << std::endl;
         std::cout << "run_type=" << partition_config.run_type << std::endl;
         //std::cout << "input_graph_vertices=" << G.number_of_nodes() << std::endl;
         //std::cout << "input_graph_edges=" << G.number_of_edges() / 2 << std::endl;
+        std::cout << "vcc_reduction_time=" << vcc_reduction_time << std::endl;
+        cout << "vcc_reduction_offset=" << to_string(R.get_cover_size_offset()) << endl;
+        cout << "vcc_kernel_vertices=" << to_string(reduVCC.remaining_nodes) << endl;
+        reduVCC.buildKernel();
+        cout << "vcc_kernel_edges=" << to_string(reduVCC.kernel_edges / 2) << endl;
         std::cout << "total_time_to_best=" << time_to_solution << std::endl;
-        std::cout << "total_solution=" << cover.cliques.size() + reduVCC.clique_cover.size() << std::endl;
+        std::cout << "ig_time=" << time_to_solution - time_without_ig << std::endl;
+        std::cout << "time_to_best_without_unwind=" << total_time - time_to_unwind << std::endl;
+        std::cout << "total_solution=" << to_string(cover.cliques.size() + reduVCC.clique_cover.size()) << std::endl;
 
         make_graph_access(vcc_adjlist, G);
 
@@ -446,7 +486,7 @@ int main(int argn, char **argv) {
 
         //reduVCC.analyzeGraph(graph_filename, G, s, false /* don't check cover */);
 
-        cout << "Reduced graph offset size: " << R.get_cover_size_offset() << endl;
+        //cout << "Reduced graph offset size: " << R.get_cover_size_offset() << endl;
 
         timer clique_timer;
 
@@ -520,7 +560,7 @@ int main(int argn, char **argv) {
 
         // pAlgorithm->AddCallBack(print_clique);
         list<list<int>> unused;
-        cout << "Filling vertex_cliques..." << endl;
+        //cout << "Filling vertex_cliques..." << endl;
         pAlgorithm->AddCallBack(fill_vertex_cliques);
         long num_cliques = pAlgorithm->Run(unused);
         pAlgorithm->PopCallBack();
@@ -642,19 +682,19 @@ int main(int argn, char **argv) {
         // Deallocate Memory
         delete[] obj;
 
-	double ilp_solver_time = ilp_solver_timer.elapsed();
-	time_to_solution += ilp_solver_time;
+        double ilp_solver_time = ilp_solver_timer.elapsed();
+        time_to_solution += ilp_solver_time;
 
         std::cout << "BEGIN_OUTPUT_FOR_TABLES" << std::endl;
         std::cout << "run_type=" << partition_config.run_type << std::endl;
         //std::cout << "input_graph_vertices=" << G.number_of_nodes() << std::endl;
         //std::cout << "input_graph_edges=" << G.number_of_edges() / 2 << std::endl;
         //std::cout << "total_time_to_best=" << time_to_solution << std::endl;
-        std::cout << "total_time=" << total_timer.elapsed() << std::endl;
         std::cout << "vcc_reduction_time=" << vcc_reduction_time << std::endl;
         std::cout << "clique_enumeration_time=" << clique_enumeration_time << std::endl;
         std::cout << "ilp_solver_setup_time=" << ilp_solver_setup_time << std::endl;
         std::cout << "ilp_solver_time=" << ilp_solver_time << std::endl;
+        std::cout << "total_time=" << total_timer.elapsed() << std::endl;
 
 	int grb_threads = 0;
         error = GRBgetintparam(env, "Threads", &grb_threads);
@@ -662,17 +702,18 @@ int main(int argn, char **argv) {
             cout << "Error getting threads in GRBgetintparam" << endl;
         }
 
-        std::cout << "ilp_solver_threads=" << grb_threads << std::endl;
-        std::cout << "vcc_reductions_offset=" << R.get_cover_size_offset() << std::endl;
-        std::cout << "kernel_maximal_cliques=" << num_cliques << std::endl;
+        std::cout << "ilp_solver_threads=" << to_string(grb_threads) << std::endl;
+        std::cout << "vcc_reduction_offset=" << to_string(R.get_cover_size_offset()) << std::endl;
+        std::cout << "vcc_kernel_maximal_cliques=" << to_string(num_cliques) << std::endl;
         double primal_objval = 0;
         //double dual_objval = 0;
         char *vtype;
         error = GRBgetdblattr(model, GRB_DBL_ATTR_OBJVAL, &primal_objval);
         //error = GRBgetdblattr(dual_model, GRB_DBL_ATTR_OBJVAL, &dual_objval);
         // error = GRBgetstrattr(dual_model, EFTYPE, &vtype);
-        cout << "ilp_solution_of_kernel=" << primal_objval << endl;
-        cout << "total_solution=" << cover.cliques.size() + R.get_cover_size_offset() + primal_objval << endl;
+        long ilp_solution = primal_objval;
+        cout << "ilp_solution_of_kernel=" << to_string(ilp_solution) << endl;
+        cout << "total_solution=" << to_string(cover.cliques.size() + R.get_cover_size_offset() + ilp_solution) << endl;
         //cout << "Objective Dual value of: " << dual_objval << endl;
         // cout << "Variable type: " << vtype << endl;
         //
@@ -680,47 +721,9 @@ int main(int argn, char **argv) {
         error = GRBgetintattr(model, "Status", &status_of_ilp_solver);
 
         std::cout << "optimal=" << (status_of_ilp_solver==GRB_OPTIMAL ? "yes" : "unknown") << endl;
-	if (status_of_ilp_solver != GRB_OPTIMAL) {
-		std::cout << "ilp_solver_status=" << status_of_ilp_solver << std::endl;
-	}
-
-        return 0;
-    } else if (partition_config.run_type == "ReduIG") {
-        redu_vcc reduVCC(vcc_adjlist);
-        std::vector<unsigned int> iso_degree;
-        iso_degree.assign(vcc_adjlist.size(), 0);
-        std::vector<unsigned int> dom_degree;
-        dom_degree.assign(vcc_adjlist.size(), 0);
-        reducer R;
-        R.exhaustive_reductions(reduVCC, iso_degree, dom_degree);
-
-        //reduVCC.analyzeGraph(graph_filename, G, s, false /* don't check cover */);
-        reduVCC.build_cover();
-        std::cout << "cover build" << std::endl;
-        double time_to_solution = 0.0;
-        reduVCC.solveKernel(partition_config, s, time_to_solution, R.get_cover_size_offset());
-        std::cout << "kernel solve" << std::endl;
-        timer unwind_timer;
-        R.unwindReductions(reduVCC, time_to_solution);
-        std::cout << "unwind redutions" << std::endl;
-        double time_to_unwind = unwind_timer.elapsed();
-        //reduVCC.analyzeGraph(graph_filename, G, s, false /* don't check cover */);
-
-        std::cout << "BEGIN_OUTPUT_FOR_TABLES" << std::endl;
-        std::cout << "run_type=" << partition_config.run_type << std::endl;
-        //std::cout << "input_graph_vertices=" << G.number_of_nodes() << std::endl;
-        //std::cout << "input_graph_edges=" << G.number_of_edges() / 2 << std::endl;
-        std::cout << "reduced_graph_vertices=" << reduVCC.kernel_adj_list.size() << std::endl;
-        std::cout << "reduced_graph_edges=" << reduVCC.kernel_edges << std::endl;
-        std::cout << "total_time_to_best=" << time_to_solution << std::endl;
-        std::cout << "time_to_best_without_unwind=" << time_to_solution - time_to_unwind << std::endl;
-        std::cout << "clique_cover_size=" << reduVCC.clique_cover.size() << std::endl;
-
-        make_graph_access(vcc_adjlist, G);
-
-        std::cout << "verified_cover=" << (reduVCC.validateCover(G) ? "passed" : "failed") << std::endl;
-        std::cout << "optimal=" << (reduVCC.clique_cover.size() == partition_config.mis ? "yes" : "unknown") << std::endl;
-
+        if (status_of_ilp_solver != GRB_OPTIMAL) {
+            std::cout << "ilp_solver_status=" << status_of_ilp_solver << std::endl;
+        }
         return 0;
     }
 #ifdef BETA
@@ -1145,38 +1148,6 @@ int main(int argn, char **argv) {
 
         return 0;
     }
-
-#endif // BETA
-    else if (partition_config.run_type == "bnr") {
-      redu_vcc reduVCC;
-      branch_and_reduce B(G, reduVCC, partition_config);
-
-
-      bool finished = false;
-
-      vertex_queue *queue = nullptr;
-      if (partition_config.redu_type == "cascading") queue = new vertex_queue(reduVCC);
-      finished = B.bandr(reduVCC, 0, queue, partition_config, s);
-      double total_time = s.elapsed();
-      B.analyzeGraph(graph_filename, G, reduVCC, s);
-
-      std::cout << "BEGIN_OUTPUT_FOR_TABLES" << std::endl;
-      std::cout << "run_type=" << partition_config.run_type << std::endl;
-      std::cout << "input_graph_vertices=" << G.number_of_nodes() << std::endl;
-      std::cout << "input_graph_edges=" << G.number_of_edges() / 2 << std::endl;
-      std::cout << "total_time_to_best=" << total_time << std::endl;
-      std::cout << "branch_count=" << B.branch_count << std::endl;
-      std::cout << "prune_count=" << B.prune_count << endl;
-      std::cout << "decompose_count=" << B.decompose_count << std::endl;
-      std::cout << "clique_cover_size=" << reduVCC.clique_cover.size() << std::endl;
-      std::cout << "verified_cover=" << (reduVCC.validateCover(G) ? "passed" : "failed") << std::endl;
-      std::cout << "optimal=" << (finished ? "yes" : "unknown") << std::endl;
-
-      return 0;
-    }
-
-#ifdef BETA
-
     else if (partition_config.run_type == "test") {
 
         timer total_timer;

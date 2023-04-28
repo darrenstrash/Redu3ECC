@@ -65,6 +65,8 @@ private:
     // branch_and_reduce(graph_access &G);
     branch_and_reduce(graph_access &G, redu_vcc &reduVCC, PartitionConfig &partition_config);
     branch_and_reduce(redu_vcc &reduVCC, PartitionConfig &partition_config);
+
+    branch_and_reduce(std::vector<std::vector<NodeID>> const &adjlist, redu_vcc &reduVCC, PartitionConfig &partition_config);
     virtual ~branch_and_reduce() {};
 
     void construct_run(PartitionConfig &partition_config);

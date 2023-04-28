@@ -86,9 +86,9 @@ vector<vector<NodeID>> ECC2VCC::compute_ecc_adjlist(std::unordered_set<std::pair
 
     //std::cout << "old ids id[15]=" << to_new_id[15] << ", id[45968]=" << to_new_id[45968] << std::endl;
 
-    std::cerr << "ecc_kernel_vertices=" << kernel_vertices << std::endl;
-    std::cerr << "ecc_kernel_all_edges=" << kernel_all_edges / 2 << std::endl;
-    std::cerr << "ecc_kernel_uncovered_edges=" << kernel_uncovered_edges / 2 << std::endl;
+    std::cout << "ecc_kernel_vertices=" << to_string(kernel_vertices) << std::endl;
+    std::cout << "ecc_kernel_all_edges=" << to_string(kernel_all_edges / 2) << std::endl;
+    std::cout << "ecc_kernel_uncovered_edges=" << to_string(kernel_uncovered_edges / 2) << std::endl;
 
     /**
     std::cout << kernel_vertices << " " << kernel_all_edges / 2 << std::endl;
@@ -243,8 +243,8 @@ vector<vector<NodeID>> ECC2VCC::compute_vcc_adjlist(
         **/
     }
 
-    std::cerr << "vcc_converted_vertices=" << vcc_adjlist.size() << std::endl;
-    std::cerr << "vcc_converted_edges=" << converted_edges << std::endl;
+    std::cout << "vcc_converted_vertices=" << to_string(vcc_adjlist.size()) << std::endl;
+    std::cout << "vcc_converted_edges=" << to_string(converted_edges) << std::endl;
 
     return vcc_adjlist;
 }

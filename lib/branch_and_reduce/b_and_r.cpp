@@ -36,6 +36,27 @@ branch_and_reduce::branch_and_reduce(graph_access &G, redu_vcc &reduVCC, Partiti
   config.force_cand = 4;
 }
 
+branch_and_reduce::branch_and_reduce(vector<vector<NodeID>> const &adjlist, redu_vcc &reduVCC, PartitionConfig &partition_config) {
+
+  construct_run(partition_config);
+
+  //if (prune_type == "reduMIS") reduVCC = redu_vcc(G, partition_config);
+  //else
+  reduVCC = redu_vcc(adjlist);
+
+  branch_count = 0;
+  prune_count = 0;
+  decompose_count = 0;
+  iso_degree.assign(reduVCC.num_nodes, 0);
+  dom_degree.assign(reduVCC.num_nodes, 0);
+  num_reductions = 0;
+  num_attempts = 0;
+
+  config.time_limit = 60;
+  config.force_cand = 4;
+}
+
+
 branch_and_reduce::branch_and_reduce(redu_vcc &reduVCC, PartitionConfig &partition_config) {
 
   construct_run(partition_config);
