@@ -361,6 +361,7 @@ int main(int argn, char **argv) {
     std::chrono::duration<double, std::milli> const ecc_reduction_time = end_ecc_reductions- start_ecc_reductions;
 
     std::cerr << "ecc_reduction_time=" << ecc_reduction_time.count() / 1000.0 << std::endl;
+    std::cerr << "ecc_reduction_offset=" << cover.cliques.size() << std::endl;
     std::cerr << "input_vertices=" << graph.n << std::endl;
     std::cerr << "input_edges=" << graph.e / 2 << std::endl;
 
@@ -371,7 +372,6 @@ int main(int argn, char **argv) {
     auto const end_convert = std::chrono::high_resolution_clock::now();
 
     std::chrono::duration<double, std::milli> const time_to_convert = end_convert - start_convert;
-    std::cerr << "ecc_reduction_offset=" << cover.cliques.size() << std::endl;
     std::cerr << "time_ecc_to_vcc=" << time_to_convert.count() / 1000.0 << std::endl;
 
     graph_access G;
@@ -649,7 +649,8 @@ int main(int argn, char **argv) {
         std::cout << "run_type=" << partition_config.run_type << std::endl;
         //std::cout << "input_graph_vertices=" << G.number_of_nodes() << std::endl;
         //std::cout << "input_graph_edges=" << G.number_of_edges() / 2 << std::endl;
-        std::cout << "total_time_to_best=" << time_to_solution << std::endl;
+        //std::cout << "total_time_to_best=" << time_to_solution << std::endl;
+        std::cout << "total_time=" << total_timer.elapsed() << std::endl;
         std::cout << "vcc_reduction_time=" << vcc_reduction_time << std::endl;
         std::cout << "clique_enumeration_time=" << clique_enumeration_time << std::endl;
         std::cout << "ilp_solver_setup_time=" << ilp_solver_setup_time << std::endl;
@@ -662,7 +663,7 @@ int main(int argn, char **argv) {
         }
 
         std::cout << "ilp_solver_threads=" << grb_threads << std::endl;
-        std::cout << "clique_cover_offset=" << R.get_cover_size_offset() << std::endl;
+        std::cout << "vcc_reductions_offset=" << R.get_cover_size_offset() << std::endl;
         std::cout << "kernel_maximal_cliques=" << num_cliques << std::endl;
         double primal_objval = 0;
         //double dual_objval = 0;
