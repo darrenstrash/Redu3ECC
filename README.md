@@ -57,12 +57,17 @@ Each algorithm can be provided with time limits, including:
 
 ## Input Format
 
-Redu3ECC uses **The unweighted METIS format**, which consists of
+Redu3ECC uses **edgelist** format, which consists of
 
-   `<# vertices> <# edges>`
+   2 x `<# edges>` lines of edges represented as pairs of space-separated vertices. If an edge
 
-   followed by `<# vertices>` lines of space-separated vertices,  where the `i`-th line consists of 
-   all neighbors of `i`. All vertices range from `1` to `<# vertices>`
+   ``vi vj`` 
+
+   appears in the file, then so should its reverse
+
+   ``vj vi``.
+
+   All vertices range from `1` to `<# vertices>`
 
 Loops and directed edges are not supported.
 

@@ -335,7 +335,14 @@ int main(int argn, char **argv) {
     bool const RULE_THREE_ENABLED = false;
     bool const RULE_FOUR_ENABLED = false;
 
-    ECCGraph graph = ECCGraph(std::cin);
+    // open file for reading
+    std::ifstream in(graph_filename.c_str());
+    if (!in) {
+        std::cerr << "Error opening " << graph_filename << std::endl;
+        return 1;
+    }
+
+    ECCGraph graph = ECCGraph(in);
     //std::cerr << "Done reading in graph.\n";
 
     timer total_timer;
