@@ -1,7 +1,7 @@
 Redu3ECC v1.0
 =====
 
-Computing minimum edge clique covers (ECCs) using data *redu*ction for ECC, problem *redu*ction to VCC, and data*redu*ction for VCC.
+Computing minimum edge clique covers (ECCs) using data **redu**ction for ECC, problem **redu**ction to VCC, and data **redu**ction for VCC.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -11,9 +11,8 @@ Citation
 
 This is this code for experiments in the article 
 
-"Solving Edge Clique Cover Exactly via Synergistic Data Reduction"
-
-by Anthony Hevia, Benjamin Kallus, Summer McClintic, Samantha Reisner, Darren Strash, and Johnathan Wilson.
+**"Solving Edge Clique Cover Exactly via Synergistic Data Reduction"
+by Anthony Hevia, Benjamin Kallus, Summer McClintic, Samantha Reisner, Darren Strash, and Johnathan Wilson.**
 
 The article is to appear at the 31st Annual European Symposium on Algorithms (ESA 2023), which takes place September 4 to September 6, 2023. Until it is officially published, there is a preprint available at (https://arxiv.org/abs/2306.17804), which is citable as
 
@@ -44,13 +43,13 @@ After installing the packages, run `scons program=redu3ecc variant=optimized` to
 This package contains 3 different algorithms: **Redu3BnR**, **ReduILP**, **ReduIG**, which can be run as follows:
 
 **Redu3BnR**
-`./optimized/vcc --preconfiguration=fsocial --k=2 --run_type="Redu3BnR" <input graph>`
+`./optimized/redu3ecc --preconfiguration=fsocial --k=2 --run_type="Redu3BnR" <input graph>`
 
 **ReduILP**
-`./optimized/vcc --preconfiguration=fsocial --k=2 --run_type="ReduILP" <input graph>`
+`./optimized/redu3ecc --preconfiguration=fsocial --k=2 --run_type="ReduILP" <input graph>`
 
 **ReduIG**
-`./optimized/vcc --preconfiguration=fsocial --k=2 [--mis=<independent set size>] --run_type="ReduIG" <input graph>`
+`./optimized/redu3ecc --preconfiguration=fsocial --k=2 [--mis=<independent set size>] --run_type="ReduIG" <input graph>`
 
 Each algorithm can be provided with time limits, including:
 - a time limit for the solver (in seconds) with `--solver_time_limit=<time in seconds>` and 
