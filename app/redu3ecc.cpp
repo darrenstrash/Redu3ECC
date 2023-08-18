@@ -400,7 +400,7 @@ int main(int argn, char **argv) {
         cout << "vcc_kernel_vertices=" << to_string(reduVCC.remaining_nodes) << endl;
         reduVCC.buildKernel();
         cout << "vcc_kernel_edges=" << to_string(reduVCC.kernel_edges / 2) << endl;
-    } else if (partition_config.run_type == "ReduBNR") {
+    } else if (partition_config.run_type == "ReduBnR") {
       redu_vcc reduVCC;
       branch_and_reduce B(vcc_adjlist, reduVCC, partition_config);
 
