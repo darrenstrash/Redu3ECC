@@ -10,30 +10,21 @@
 // local includes
 #include "ecc_to_vcc.hpp"
 #include "graph.hpp"
-
-namespace std
-{
-    template<> struct hash<std::pair<NodeID,NodeID>>
-    {
-        size_t operator()(std::pair<NodeID,NodeID> const & node_pair) const noexcept
-        {
-            size_t seed = 0;
-            boost::hash_combine(seed, std::get<0>(node_pair));
-            boost::hash_combine(seed, std::get<1>(node_pair));
-            return seed;
-        }
-    };
-};
-
+#include "mis/kernel/fast_set.h"
 
 using namespace std;
 
-vector<vector<NodeID>> ECC2VCC::compute_ecc_adjlist(std::unordered_set<std::pair<NodeID, NodeID>> & uncovered) const {
+adjlist_t ECC2VCC::compute_ecc_adjlist(
+        edgeset_t & uncovered,
+        nodemap_t & to_old_id) const
+{
+    assert(uncovered.empty());
+    assert(to_old_id.empty());
     size_t kernel_vertices = 0;
     size_t kernel_all_edges = 0;
     size_t kernel_uncovered_edges = 0;
 
-    vector<vector<NodeID>> ecc_adjlist;
+    adjlist_t ecc_adjlist;
     // TODO: Could be really expensive, better way to reserve?
     //ecc_adjlist.reserve(graph.n);
 
@@ -41,7 +32,7 @@ vector<vector<NodeID>> ECC2VCC::compute_ecc_adjlist(std::unordered_set<std::pair
 
     // step 1: reconstruct adjacency list of ecc kernel
     NodeID new_id = 1;
-    std::unordered_map<NodeID, NodeID> to_new_id;
+    nodemap_t to_new_id;
 
     for (auto const& [v1, v1_neighbors] : graph.get_adj_list()) {
         if (cover.is_removed(v1)) continue;
@@ -49,6 +40,7 @@ vector<vector<NodeID>> ECC2VCC::compute_ecc_adjlist(std::unordered_set<std::pair
 
         if (to_new_id.find(v1) == to_new_id.end()) {
             //std::cout << v1 << " -> " << new_id << std::endl;
+            to_old_id[new_id] = v1;
             to_new_id[v1] = new_id++;
         }
 
@@ -60,6 +52,7 @@ vector<vector<NodeID>> ECC2VCC::compute_ecc_adjlist(std::unordered_set<std::pair
             // TODO: move below ifs, only for testing
             if (to_new_id.find(v2) == to_new_id.end()) {
                 //std::cout << v2 << " -> " << new_id << std::endl;
+                to_old_id[new_id] = v2;
                 to_new_id[v2] = new_id++;
             }
 
@@ -107,24 +100,26 @@ vector<vector<NodeID>> ECC2VCC::compute_ecc_adjlist(std::unordered_set<std::pair
     return ecc_adjlist;
 }
 
-vector<vector<NodeID>> ECC2VCC::compute_vcc_adjlist(
-    const vector<vector<NodeID>> & ecc_adjlist,
-    std::unordered_set<std::pair<NodeID, NodeID>> & uncovered) const {
+adjlist_t ECC2VCC::compute_vcc_adjlist(
+    adjlist_t const & ecc_adjlist,
+    edgeset_t const & uncovered,
+    nodeedgemap_t   & vertex_to_edge_map) const {
 
+    // TODO: Make 0-based ids without using -1 everywhere.
     NodeID new_id = 1;
 
-    std::unordered_map<std::pair<NodeID, NodeID>, NodeID> ids; 
+    edgenodemap_t ids; 
 
     NodeID  last_uncovered_id = 0;
 
-    vector<std::pair<NodeID, NodeID>> uncovered_list(uncovered.begin(), uncovered.end());
+    vector<edge_t> uncovered_list(uncovered.begin(), uncovered.end());
     sort(uncovered_list.begin(), uncovered_list.end()
         /**,
         [](std::pair<NodeID,NodeID> const & e1, std::pair<NodeID,NodeID> const & e2) {
             return get<0>(e1) > get<0>(e2) or (get<0>(e1) == get<0>(e2) and get<1>(e1) > get<1>(e2));
         }**/);
 
-    std::pair<NodeID, NodeID> debug_edge;
+    edge_t debug_edge;
 ////    bool debug = false;
 
     for (auto edge : uncovered_list) {
@@ -135,6 +130,8 @@ vector<vector<NodeID>> ECC2VCC::compute_vcc_adjlist(
 ////                debug_edge = edge;
 ////                std::cout << "(" << get<0>(edge) << ", " << get<1>(edge) << ") -> " << new_id << std::endl;
 ////            }
+            // NOTE: reverse map uses 0-based ids.
+            vertex_to_edge_map[new_id - 1] = edge;
             ids[edge] = new_id++;
         }
     }
@@ -152,6 +149,9 @@ vector<vector<NodeID>> ECC2VCC::compute_vcc_adjlist(
 ////                    debug_edge = std::make_pair(u, neighbor);
 ////                    std::cout << "(" << u << ", " << neighbor << ") -> " << new_id << std::endl;
 ////                }
+                // NOTE: reverse map uses 0-based ids.
+                // NOTE: only storing uncovered edges in map
+                // vertex_to_edge_map[new_id - 1] = std::make_pair(u, neighbor);
                 ids[std::make_pair(u, neighbor)] = new_id++;
             }
         }
@@ -252,9 +252,82 @@ vector<vector<NodeID>> ECC2VCC::compute_vcc_adjlist(
 vector<vector<NodeID>> ECC2VCC::ecc_to_vcc() const {
 
     std::unordered_set<std::pair<NodeID, NodeID>> uncovered;
-    vector<vector<NodeID>> ecc_adjlist = compute_ecc_adjlist(uncovered);
+    std::unordered_map<NodeID, NodeID> to_old_id;
+    vector<vector<NodeID>> ecc_adjlist = compute_ecc_adjlist(uncovered, to_old_id);
 
-    vector<vector<NodeID>> vcc_adjlist = compute_vcc_adjlist(ecc_adjlist, uncovered);
+    std::unordered_map<NodeID,std::pair<NodeID,NodeID>> vertex_to_edge_map; // unused
+    adjlist_t vcc_adjlist = compute_vcc_adjlist(ecc_adjlist, uncovered, vertex_to_edge_map);
 
     return vcc_adjlist;
+}
+
+adjlist_t ECC2VCC::ecc_to_vcc(nodeedgemap_t & vcc_vertex_to_ecc_edge_map) const
+{
+    assert(vcc_vertex_to_ecc_edge_map.empty());
+
+    edgeset_t uncovered;
+    nodemap_t to_old_id;
+
+    adjlist_t ecc_adjlist = compute_ecc_adjlist(uncovered, to_old_id);
+
+    nodeedgemap_t vertex_to_edge_map;
+    adjlist_t vcc_adjlist = compute_vcc_adjlist(ecc_adjlist, uncovered, vertex_to_edge_map);
+
+    //cout << "DEBUG: Map of vertices to edges" << endl;
+    // for each remapped edge in the ecc kernel, remap to be edge in original graph.
+    for (auto const & [v, edge] : vertex_to_edge_map) {
+        assert(uncovered.find(edge) != uncovered.end());
+        edge_t const & orig_edge = std::make_pair(to_old_id[get<0>(edge)],to_old_id[get<1>(edge)]);
+        vcc_vertex_to_ecc_edge_map[v] = orig_edge;
+        //cout << "DEBUG:    " << v << " -> (" << to_old_id[get<0>(edge)] << "," << to_old_id[get<1>(edge)] << ")" << endl;
+    }
+    return vcc_adjlist;
+}
+
+void ECC2VCC::add_vcc_cliques_to_ecc_cover(
+        vector<clique_t> const & vcc_cliques,
+        nodeedgemap_t & v_to_e_map) 
+{
+        fast_set fs(graph.vertices.size());
+        node_container_t ecc_clique;
+        for (const clique_t & vcc_clique : vcc_cliques) {
+            ecc_clique.reserve(vcc_clique.size() * 2);
+            ecc_clique.clear();
+////            cout << "DEBUG: vclique:";
+////            for (const node_t & v : vcc_clique) {
+////                cout << " " << v;
+////            }
+////            cout << endl;
+            // add ecc edges to clique
+            for (const node_t & v : vcc_clique) {
+////                cout << "checking map for vertex v=" << v << endl;
+                assert(v_to_e_map.find(v) != v_to_e_map.end());
+                edge_t const & edge = v_to_e_map[v];
+
+                if (!fs.get(get<0>(edge))) {
+                    fs.add(get<0>(edge));
+                    ecc_clique.push_back(get<0>(edge));
+                }
+
+                if (!fs.get(get<1>(edge))) {
+                    fs.add(get<1>(edge));
+                    ecc_clique.push_back(get<1>(edge));
+                }
+////                cout << "DEBUG:    " << v << " -> (" << get<0>(edge) << "," << get<1>(edge) << ")" << endl;
+            }
+                // only sort output, cliques themselves don't need to be in sorted order
+////            //then sort and uniquify
+////            std::sort(ecc_clique.begin(), ecc_clique.end());
+////            auto it = std::unique(ecc_clique.begin(), ecc_clique.end());
+////            ecc_clique.resize(std::distance(ecc_clique.begin(), it));
+////            cout << "DEBUG: eclique:";
+////            for (const node_t & v : ecc_clique) {
+////                cout << " " << v;
+////            }
+////            cout << endl;
+////            cout << "DEBUG: vclique of size " << vcc_clique.size() << " -> eclique of size " << ecc_clique.size() << endl;
+////            ecc_cover.emplace_back(ecc_clique);
+            cover.cover_clique(ecc_clique); // add clique to ecc
+            fs.clear();
+        }
 }

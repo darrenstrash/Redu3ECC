@@ -2,10 +2,13 @@
 #include <sstream>
 #include <string>
 #include <istream>
+#include <iostream>
 #include <unordered_map>
 
 #include "graph.hpp"
 #include "adjacency_list.hpp"
+
+using namespace std;
 
 ECCGraph::ECCGraph() {
     n = 0;
@@ -18,7 +21,7 @@ ECCGraph::ECCGraph(std::istream& is) {
     n = 0;
     e = 0;
 
-    std::unordered_map<node_t, node_t> old_to_new;
+    nodemap_t old_to_new;
     node_t new_id = 0;
 
     std::string line;
@@ -46,12 +49,20 @@ ECCGraph::ECCGraph(std::istream& is) {
         iss >> v1;
         node_t v2;
         iss >> v2;
-        if (v1 == v2) continue; // We don't deal with loops
+        if (v1 == v2) {
+            cout << "WARNING: input contains loop (" << v1 << "," << v1 << "). Removing..." << endl;
+            continue; // We don't deal with loops
+        }
 
-        if (old_to_new.find(v1) == old_to_new.end())
+        if (old_to_new.find(v1) == old_to_new.end()) {
+            to_original_id[new_id] = v1;
             old_to_new[v1] = new_id++;
-        if (old_to_new.find(v2) == old_to_new.end())
+        }
+
+        if (old_to_new.find(v2) == old_to_new.end()) {
+            to_original_id[new_id] = v2;
             old_to_new[v2] = new_id++;
+        }
 
         v1 = old_to_new[v1];
         v2 = old_to_new[v2];
@@ -59,9 +70,11 @@ ECCGraph::ECCGraph(std::istream& is) {
         if (not has_node(v1)) {
             add_node(v1);
         }
+
         if (not has_node(v2)) {
             add_node(v2);
         }
+
         add_edge(v1, v2);
     }
 }

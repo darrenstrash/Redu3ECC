@@ -211,11 +211,14 @@ void twin_reduction::unfoldTWIN(redu_vcc &reduVCC,
 
   partial_clique.push_back(a);
   reduVCC.replaceClique(cliqueID, partial_clique);
+////  std::cout << "   with: "; reduVCC.printVectorSet(partial_clique);
 
   std::vector<NodeID> new_clique1 {v, b};
   reduVCC.addCliqueToCover(new_clique1);
+////  std::cout << "   add: "; reduVCC.printVectorSet(new_clique1);
   std::vector<NodeID> new_clique2 {u, c};
   reduVCC.addCliqueToCover(new_clique2);
+////  std::cout << "   add: "; reduVCC.printVectorSet(new_clique2);
 }
 
 void twin_reduction::unfold( redu_vcc &reduVCC){
@@ -228,6 +231,8 @@ void twin_reduction::unfold( redu_vcc &reduVCC){
   unsigned int fold_cliqueID = reduVCC.solve_node_clique[y];
   // std::vector<NodeID> fold_clique = reduVCC.getClique(y);
   std::vector<NodeID> fold_clique = reduVCC.clique_cover[fold_cliqueID];
+////  std::cout << "TWN: Unfold y=" << y << ", case=";
+////  std::cout << "Replace: "; reduVCC.printVectorSet(fold_clique); std::cout << std::endl;
 
   std::vector<NodeID> partial_clique; // fold_clique \setminus y
   for (NodeID a : fold_clique) {
@@ -237,15 +242,17 @@ void twin_reduction::unfold( redu_vcc &reduVCC){
 
 
   if (isSubset(reduVCC, partial_clique, N_w)) {
+////    std::cout << "1" << std::endl;
     unfoldTWIN(reduVCC, partial_clique, fold_cliqueID, w, x, y);
   }
   else if (isSubset(reduVCC, partial_clique, N_x)) {
+////    std::cout << "2" << std::endl;
     unfoldTWIN(reduVCC, partial_clique, fold_cliqueID, x, w, y);
   }
   else {
+////    std::cout << "3" << std::endl;
     unfoldTWIN(reduVCC, partial_clique, fold_cliqueID, y, w, x);
   }
-
 }
 
 void twin_reduction::unreduce( redu_vcc &reduVCC){

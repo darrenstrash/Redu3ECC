@@ -8,8 +8,10 @@
 #include <sstream>
 #include <stdio.h>
 #include <string.h>
+#include <limits>
 
 #include "redu_vcc.h"
+#include "mis/kernel/fast_set.h"
 
 void redu_vcc::generateAdjList(graph_access &G) {
   /* Generates adjacency list from graph */
@@ -70,7 +72,7 @@ void redu_vcc::init() {
   merge_node.assign(num_nodes, false);
   remaining_nodes = num_nodes;
   // allocate for graph cover
-  node_clique.resize(num_nodes);
+  node_clique.resize(num_nodes); //, INVALID_CLIQUE_ID);
 
   // initialize mis mapping to 0
   curr_mis = 0;
@@ -207,6 +209,16 @@ void redu_vcc::build_cover(){
   // prepare to solve, by setting solve node_clique mapping and next cliqueID
   solve_node_clique = node_clique;
   next_solvecliqueID = next_cliqueID;
+
+////  std::cout << "After calling build_cover, cover is:" << std::endl;
+////  int clique_id = 0;
+////  for (auto clique : clique_cover) {
+////      std::cout << "Clique " << clique_id++ << ":";
+////      for (auto u : clique) {
+////          std::cout << " " << u;
+////      }
+////      std::cout << std::endl;
+////  }
 }
 
 bool redu_vcc::cliqueInG(graph_access &G, std::vector<NodeID> &clique) {
@@ -264,6 +276,7 @@ bool redu_vcc::validateCover(graph_access &G) {
 
 void redu_vcc::assignMaps() {
 
+  // initialize nodes to ids that are too big
   old_to_new_map.clear();
   old_to_new_map.resize(num_nodes);
   new_to_old_map.clear();
@@ -307,14 +320,16 @@ void redu_vcc::buildKernel() {
   }
 }
 
-void redu_vcc::addKernelCliques(std::vector<std::vector<int>> &clique_set){
+void redu_vcc::addKernelCliques(std::vector<std::vector<int>> &clique_set) {
 
   for (unsigned int i = 0; i < clique_set.size(); i++){
+////      std::cout << "Adding clique " << i << ":";
       std::vector<NodeID> clique;
 
       for (unsigned int j = 0; j < clique_set[i].size(); j++){
           int v = clique_set[i][j];
-////          assert(new_to_old_map.find(v) != new_to_old_map.end());
+////          std::cout << "Vertex is v=" << v << ", and |n2omap|=" << new_to_old_map.size() << ", and n2omap[v] = " << new_to_old_map[v] << std::endl;
+          assert(v >= 0 && size_t(v) < new_to_old_map.size() && new_to_old_map[v] < adj_list.size());
           NodeID old_v = new_to_old_map[v];
 
 ////          assert (old_v < solve_node_clique.size());
@@ -322,6 +337,10 @@ void redu_vcc::addKernelCliques(std::vector<std::vector<int>> &clique_set){
           clique.push_back(old_v);
       }
       std::sort(clique.begin(), clique.end());
+////      for (NodeID v : clique) {
+////          std::cout << " " << v;
+////      }
+////      std::cout << std::endl;
 
       addCliqueToCover(clique);
   }
@@ -342,6 +361,56 @@ void redu_vcc::addKernelCliques(std::vector<std::vector<int>> &clique_set){
 ////  }
 //////#endif
 }
+
+// Expected that this is only called once. Slow because it creates a fast_set.
+void redu_vcc::addKernelCliquesFixOverlapsSlow(std::vector<std::vector<int>> &clique_set) {
+
+  fast_set fs(adj_list.size());
+
+  for (unsigned int i = 0; i < clique_set.size(); i++){
+////      std::cout << "Adding clique " << i << ":";
+      std::vector<NodeID> clique;
+
+      for (unsigned int j = 0; j < clique_set[i].size(); j++){
+          int v = clique_set[i][j];
+////          std::cout << "Vertex is v=" << v << ", and |n2omap|=" << new_to_old_map.size() << ", and n2omap[v] = " << new_to_old_map[v] << std::endl;
+          assert(v >= 0 && size_t(v) < new_to_old_map.size() && new_to_old_map[v] < adj_list.size());
+          NodeID old_v = new_to_old_map[v];
+
+////          assert (old_v < solve_node_clique.size());
+
+          if (!fs.get(old_v)) {
+              solve_node_clique[old_v] = false;
+              clique.push_back(old_v);
+              fs.add(old_v);
+          }
+      }
+      std::sort(clique.begin(), clique.end());
+////      for (NodeID v : clique) {
+////          std::cout << " " << v;
+////      }
+////      std::cout << std::endl;
+
+      addCliqueToCover(clique);
+  }
+
+////#ifdef DEBUG
+////  // check that covering kernel
+////  std::vector<bool> vertex_covered(kernel_adj_list.size(), false);
+////  for (auto clique : clique_set) {
+////    for (auto v : clique) {
+////        vertex_covered[v] = true;
+////    }
+////  }
+////  for (NodeID v = 0; v < kernel_adj_list.size(); v++) {
+////    if (!vertex_covered[v]) {
+////        std::cout << "Vertex " << v << " is not covered!" << std::endl;
+////        assert(false);
+////    }
+////  }
+//////#endif
+}
+
 
 void redu_vcc::addCrownCliques(std::vector<std::vector<NodeID>> &crown_cliques, std::vector<std::vector<int>> &clique_set) {
 

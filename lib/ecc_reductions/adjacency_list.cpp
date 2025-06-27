@@ -2,42 +2,6 @@
 #include "adjacency_list.hpp"
 #include <initializer_list>
 
-// for hashing
-#include <boost/functional/hash.hpp>
-
-////size_t NodePairHash2::operator()(std::pair<uint32_t, uint32_t> const& p) const {
-////    // Ensure that size_t, the type of the hash, is large enough
-////    // assert(sizeof(size_t) >= sizeof(uint32_t) * 2); // It usually is
-////    //return (((size_t)p.first) << sizeof(uint32_t)) | (size_t)p.second;
-////    //DS: a real hash function
-////    size_t seed = 0;
-////    boost::hash_combine(seed, std::get<0>(p));
-////    boost::hash_combine(seed, std::get<1>(p));
-////    return seed;
-////}
-////
-
-// please don't call this
-bool NodeVector::contains(node_t const& node) const {
-    assert(0);
-    return std::find(cbegin(), cend(), node) != cend();
-}
-
-void NodeVector::insert(node_t const& node) {
-    push_back(node);
-}
-
-// please don't call this either
-void NodeVector::erase(node_t const& node) {
-    assert(0);
-    // two full passes. Should just perform one pass, swap to end and remove.
-    auto it = std::find(cbegin(), cend(), node);
-    if (it != cend()) {
-        std::vector<node_t>& vec = *this;
-        vec.erase(it);
-    }
-}
-
 // All this find->second business needs to get cleaned up.
 AdjacencyList::AdjacencyList() {}
 

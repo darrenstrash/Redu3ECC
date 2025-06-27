@@ -18,7 +18,7 @@
 #include <queue>
 #include <set>
 
-#define NDEBUG
+////#define NDEBUG
 #include <cassert>
 
 typedef unsigned int ui;

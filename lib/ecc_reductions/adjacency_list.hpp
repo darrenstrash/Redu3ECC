@@ -1,26 +1,6 @@
 #pragma once
 
-#include <unordered_map>
-#include <unordered_set>
-#include <cstdint>
-#include <vector>
-
-typedef uint32_t node_t; // I might eventually need more than 4 billion nodes...
-
-////struct NodePairHash2 {
-////    size_t operator()(std::pair<uint32_t, uint32_t> const& p) const;
-////};
-
-
-class NodeVector : public std::vector<node_t> {
-public:
-    bool contains(node_t const&) const;
-    void insert(node_t const&);
-    void erase(node_t const&);
-};
-
-typedef NodeVector node_container_t;
-typedef std::unordered_map<node_t, node_container_t> adj_list_data_t;
+#include "types.hpp"
 
 class AdjacencyList {
 public:

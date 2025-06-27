@@ -157,8 +157,8 @@ libmapping                = ['lib/mapping/local_search_mapping.cpp',
 #
 libspac_files = ['lib/spac/spac.cpp']
 #
-env['CXX'] = 'g++-12'
-env['CC'] = 'gcc-12'
+env['CXX'] = 'g++'
+env['CC'] = 'gcc'
 #
 if env['program'] == 'redu3ecc':
         env.Append(CXXFLAGS = '-DMODE_KAFFPA')
@@ -213,10 +213,10 @@ if env['program'] == 'kaffpaE':
                 env['CXX'] = 'mpicxx'
         env.Program('kaffpaE', ['app/kaffpaE.cpp']+libkaffpa_files+libkaffpa_parallel_async, LIBS=['gomp'])
 #
-if env['program'] == 'graphchecker':
+if env['program'] == 'checker':
         env.Append(CXXFLAGS = '-DMODE_GRAPHCHECKER')
         env.Append(CCFLAGS  = '-DMODE_GRAPHCHECKER')
-        env.Program('graphchecker', ['app/graphchecker.cpp'], LIBS=['gomp'])
+        env.Program('checker', ['app/checker.cpp'], LIBS=[])
 #
 if env['program'] == 'library':
         env.Append(CXXFLAGS = '-fPIC')

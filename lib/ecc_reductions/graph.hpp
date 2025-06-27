@@ -13,6 +13,7 @@ public:
     size_t n;
     size_t e;
     std::vector<node_t> vertices;
+    nodemap_t to_original_id;
 
     ECCGraph();
     ECCGraph(std::istream&);

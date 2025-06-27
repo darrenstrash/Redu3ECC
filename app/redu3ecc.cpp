@@ -65,21 +65,11 @@
 #include "ecc_reductions/ecc_to_vcc.hpp"
 
 
-#ifdef BETA
-namespace std
-{
-    template<> struct hash<std::pair<NodeID,NodeID>>
-    {
-        std::size_t operator()(std::pair<NodeID,NodeID> const & node_pair) const noexcept
-        {
-            std::size_t seed = 0;
-            boost::hash_combine(seed, std::get<0>(node_pair));
-            boost::hash_combine(seed, std::get<1>(node_pair));
-            return seed;
-        }
-    };
-};
+typedef NodeID node_t;
+typedef std::vector<NodeID> clique_t;
+//typedef node_container_t clique_t;
 
+#ifdef BETA
 void transform_graph(graph_access const &G,
                      graph_access       &transformed_graph,
                      std::vector<std::pair<NodeID,NodeID>> &vertex_to_edge) {
@@ -342,10 +332,12 @@ int main(int argn, char **argv) {
         return 1;
     }
 
+    cout << "Reading the graph" << endl;
     ECCGraph graph = ECCGraph(in);
     //std::cerr << "Done reading in graph.\n";
 
     timer total_timer;
+    cout << "Initializing the cover object" << endl;
     Cover cover = Cover(graph.n);
 
     std::string const basename = ""; //argv[1];
@@ -359,10 +351,11 @@ int main(int argn, char **argv) {
     std::cout.precision(4);
 
     std::cout << "input_vertices=" << to_string(graph.n) << std::endl;
-    std::cout << "input_edges=" << to_string(graph.e / 2) << std::endl;
+    std::cout << "input_edges=" << to_string(graph.e) << std::endl;
 
     auto const start_ecc_reductions = std::chrono::high_resolution_clock::now();
     auto const start = start_ecc_reductions;
+    cout << "Preparing to run reductions..." << endl;
     apply_reductions(graph, cover, RULE_ONE_ENABLED, RULE_TWO_ENABLED, RULE_THREE_ENABLED, RULE_FOUR_ENABLED);
 
     //bool found_cover = compute_edge_clique_cover(graph, cover, basename, k, total_calls, RULE_ONE_ENABLED, RULE_TWO_ENABLED, RULE_THREE_ENABLED, RULE_FOUR_ENABLED);
@@ -375,7 +368,8 @@ int main(int argn, char **argv) {
     // convert to vcc
     auto const start_convert = std::chrono::high_resolution_clock::now();
     ECC2VCC converter(graph, cover);
-    vector<vector<NodeID>> vcc_adjlist = converter.ecc_to_vcc();
+    nodeedgemap_t v_to_e_map;
+    adjlist_t vcc_adjlist = converter.ecc_to_vcc(v_to_e_map);
     auto const end_convert = std::chrono::high_resolution_clock::now();
 
     std::chrono::duration<double, std::milli> const time_to_convert = end_convert - start_convert;
@@ -386,7 +380,7 @@ int main(int argn, char **argv) {
     //graph_io::readGraphWeighted(G, graph_filename);
 
 
-    if (partition_config.run_type == "Redu") {
+    if (partition_config.run_type == "Redu3") {
         timer reduce_timer;
         redu_vcc reduVCC(vcc_adjlist);
         std::vector<unsigned int> iso_degree;
@@ -407,7 +401,7 @@ int main(int argn, char **argv) {
         cout << "vcc_kernel_vertices=" << to_string(reduVCC.remaining_nodes) << endl;
         reduVCC.buildKernel();
         cout << "vcc_kernel_edges=" << to_string(reduVCC.kernel_edges / 2) << endl;
-    } else if (partition_config.run_type == "ReduBnR") {
+    } else if (partition_config.run_type == "Redu3BnR") {
       redu_vcc reduVCC;
       branch_and_reduce B(vcc_adjlist, reduVCC, partition_config);
 
@@ -420,22 +414,48 @@ int main(int argn, char **argv) {
       double total_time = total_timer.elapsed();
       //B.analyzeGraph(graph_filename, G, reduVCC, s);
 
+      // Unwind ECC to VCC transformation, by mapping VCC cliques back to ECC problem
+      timer unwind_ecc_to_vcc_timer;
+      vector<clique_t> const & vcc_cover = reduVCC.clique_cover;
+      converter.add_vcc_cliques_to_ecc_cover(vcc_cover, v_to_e_map);
+      double time_to_unwind_ecc_to_vcc = unwind_ecc_to_vcc_timer.elapsed();
+
+      total_time += time_to_unwind_ecc_to_vcc;
+
+      // verifying ECC after timer is complete
+      bool const ecc_verified = cover.verify_cover(graph, true /* verbose */);
+      if (finished && !ecc_verified) {
+          cout << "ERROR: Redu3BnR finished, but ECC could not be verified" << endl;
+          return 1;
+      }
+
       std::cout << "BEGIN_OUTPUT_FOR_TABLES" << std::endl;
       std::cout << "run_type=" << partition_config.run_type << std::endl;
-      std::cout << "bnr_time=" << bandr_time << std::endl;
-      std::cout << "total_time=" << total_time << std::endl;
+      std::cout << "bnr_solver_time=" << bandr_time << std::endl;
+      std::cout << "time_with_unwind=" << total_time << std::endl;
+      std::cout << "time_to_unwind_ecc_to_vcc=" << time_to_unwind_ecc_to_vcc << std::endl;
+      std::cout << "time_without_unwind=" << total_time - time_to_unwind_ecc_to_vcc << std::endl;
       std::cout << "branch_count=" << to_string(B.branch_count) << std::endl;
       std::cout << "prune_count=" << to_string(B.prune_count) << endl;
       std::cout << "decompose_count=" << to_string(B.decompose_count) << std::endl;
-      std::cout << "total_solution=" << to_string(cover.cliques.size() + reduVCC.clique_cover.size()) << std::endl;
+      std::cout << "total_solution=" << to_string(cover.cliques.size()) << std::endl;
 
       make_graph_access(vcc_adjlist, G);
 
-      std::cout << "verified_cover=" << (reduVCC.validateCover(G) ? "passed" : "failed") << std::endl;
-      std::cout << "optimal=" << (finished ? "yes" : "unknown") << std::endl;
+      std::cout << "vcc_verified_cover=" << (reduVCC.validateCover(G) ? "passed" : "failed") << std::endl;
+      std::cout << "ecc_verified_cover=" << (ecc_verified ? "passed" : "failed") << std::endl;
+      std::cout << "solution_is_optimal=" << (finished ? "yes" : "unknown") << std::endl;
+
+      if (!partition_config.filename_output.empty()) {
+          if (!finished) {
+              cout << "NOTE: Redu3BnR not finished, skipping writing to file " << partition_config.filename_output << endl;
+          } else {
+              cover.write_cover(graph, partition_config.filename_output);
+          }
+      }
 
       return 0;
-    } else if (partition_config.run_type == "ReduIG") {
+    } else if (partition_config.run_type == "Redu3IG") {
         timer reduce_timer;
         redu_vcc reduVCC(vcc_adjlist);
         std::vector<unsigned int> iso_degree;
@@ -452,32 +472,63 @@ int main(int argn, char **argv) {
         reduVCC.solveKernel(partition_config, total_timer, time_to_solution, cover.cliques.size() + R.get_cover_size_offset() /* clique cover offset */);
         //reduVCC.analyzeGraph(graph_filename, G, s, false /* don't check cover */);
 
-        timer unwind_timer;
-        R.unwindReductions(reduVCC, time_to_solution);
-        double time_to_unwind = unwind_timer.elapsed();
+        // Post processing
+
+        // Unwinding reductions and transformations
+        double time_to_unwind = 0.0;
+
+        // unwind VCC reductions
+        timer unwind_vcc_reductions_timer;
+        R.unwindReductions(reduVCC);
+        double time_to_unwind_vcc = unwind_vcc_reductions_timer.elapsed();
+        time_to_unwind += time_to_unwind_vcc;
+
+        // Unwind ECC to VCC transformation, by mapping VCC cliques back to ECC problem
+        timer unwind_ecc_to_vcc_timer;
+        vector<clique_t> const & vcc_cover = reduVCC.clique_cover;
+        converter.add_vcc_cliques_to_ecc_cover(vcc_cover, v_to_e_map);
+        double time_to_unwind_ecc_to_vcc = unwind_ecc_to_vcc_timer.elapsed();
+        time_to_unwind += time_to_unwind_ecc_to_vcc;
+
+        time_to_solution += time_to_unwind;
+
+        // total time -> not reported for heuristic experiments
         double total_time = total_timer.elapsed();
+
+        // verifying ECC after timer is complete
+        bool const ecc_verified = cover.verify_cover(graph, true /* verbose */);
 
         std::cout << "BEGIN_OUTPUT_FOR_TABLES" << std::endl;
         std::cout << "run_type=" << partition_config.run_type << std::endl;
-        //std::cout << "input_graph_vertices=" << G.number_of_nodes() << std::endl;
-        //std::cout << "input_graph_edges=" << G.number_of_edges() / 2 << std::endl;
         std::cout << "vcc_reduction_time=" << vcc_reduction_time << std::endl;
         cout << "vcc_reduction_offset=" << to_string(R.get_cover_size_offset()) << endl;
         cout << "vcc_kernel_vertices=" << to_string(reduVCC.remaining_nodes) << endl;
         reduVCC.buildKernel();
         cout << "vcc_kernel_edges=" << to_string(reduVCC.kernel_edges / 2) << endl;
-        std::cout << "total_time_to_best=" << time_to_solution << std::endl;
-        std::cout << "ig_time=" << time_to_solution - time_without_ig << std::endl;
-        std::cout << "time_to_best_without_unwind=" << total_time - time_to_unwind << std::endl;
-        std::cout << "total_solution=" << to_string(cover.cliques.size() + reduVCC.clique_cover.size()) << std::endl;
+        std::cout << "time_to_best_with_unwind=" << time_to_solution << std::endl;
+        std::cout << "ig_solver_time=" << time_to_solution - time_to_unwind - time_without_ig << std::endl;
+        std::cout << "time_to_unwind_vcc_reductions=" << time_to_unwind_vcc << std::endl;
+        std::cout << "time_to_unwind_ecc_to_vcc=" << time_to_unwind_ecc_to_vcc << std::endl;
+        std::cout << "time_to_best_without_unwind=" << time_to_solution - time_to_unwind << std::endl;
+        std::cout << "total_solution=" << to_string(cover.cliques.size()) << std::endl;
 
         make_graph_access(vcc_adjlist, G);
 
-        std::cout << "verified_cover=" << (reduVCC.validateCover(G) ? "passed" : "failed") << std::endl;
-        std::cout << "optimal=" << (reduVCC.clique_cover.size() == partition_config.mis ? "yes" : "unknown") << std::endl;
+        std::cout << "vcc_verified_cover=" << (reduVCC.validateCover(G) ? "passed" : "failed") << std::endl;
+        std::cout << "ecc_verified_cover=" << (ecc_verified ? "passed" : "failed") << std::endl;
+        std::cout << "solution_is_optimal=" << (reduVCC.clique_cover.size() == partition_config.mis ? "yes" : "unknown") << std::endl;
+
+        if (!partition_config.filename_output.empty()) {
+            if (!ecc_verified) {
+                cout << "NOTE: ECC not verified, skipping writing to file " << partition_config.filename_output << endl;
+            } else {
+                cover.write_cover(graph, partition_config.filename_output);
+            }
+        }
+
         return 0;
     }
-    else if (partition_config.run_type == "ReduILP") {
+    else if (partition_config.run_type == "Redu3ILP") {
         double time_to_solution = 0.0;
         timer reduce_timer;
         redu_vcc reduVCC(vcc_adjlist);
@@ -487,6 +538,10 @@ int main(int argn, char **argv) {
         dom_degree.assign(vcc_adjlist.size(), 0);
         reducer R;
         R.exhaustive_reductions(reduVCC, iso_degree, dom_degree);
+
+        // prepare for adding new cliques
+        reduVCC.build_cover();
+        reduVCC.buildKernel();
 
         double vcc_reduction_time = reduce_timer.elapsed();
         time_to_solution += vcc_reduction_time;
@@ -516,7 +571,7 @@ int main(int argn, char **argv) {
 
         for (int i = 0; i < reduced_size; i++) {
             list<int> current_row(reduVCC.kernel_adj_list[i].begin(), reduVCC.kernel_adj_list[i].end());
-            adjlist.push_back(current_row);
+            adjlist.emplace_back(current_row);
         }
 
         // forall_nodes(G, v) {
@@ -596,10 +651,10 @@ int main(int argn, char **argv) {
 
         delete pAlgorithm; pAlgorithm = nullptr;
 
-	double clique_enumeration_time = clique_timer.elapsed();
-	time_to_solution += clique_enumeration_time;
+        double clique_enumeration_time = clique_timer.elapsed();
+        time_to_solution += clique_enumeration_time;
 
-	timer ilp_setup_time;
+        timer ilp_setup_time;
 
         //
 
@@ -618,17 +673,18 @@ int main(int argn, char **argv) {
             cout << "Error setting time limit in in GRBsetdblparam" << endl;
         }
 
-	int threads = 1;
-
+        int threads = 1;
         error = GRBsetintparam(env, "Threads", threads);
         if (error) {
             cout << "Error setting threads in GRBsetintparam" << endl;
+            return 1;
         }
 
         // Create an empty model
         error = GRBnewmodel(env, &model, "clique_gurobi", 0, NULL, NULL, NULL, NULL, NULL);
         if (error) {
             cout << "Error in GRBnewmodel" << endl;
+            return 1;
         }
 
         // Add variables
@@ -639,6 +695,7 @@ int main(int argn, char **argv) {
         error = GRBaddvars(model, num_cliques, 0, NULL, NULL, NULL, obj, NULL, NULL, types, NULL);
         if (error) {
             cout << "Error in GRBaddvars" << endl;
+            return 1;
         }
         delete[] types;
 
@@ -646,6 +703,7 @@ int main(int argn, char **argv) {
         error = GRBsetintattr(model, GRB_INT_ATTR_MODELSENSE, GRB_MINIMIZE);
         if (error) {
             cout << "Error in GRBsetintattr" << endl;
+            return 1;
         }
 
         // Add constraints
@@ -663,27 +721,29 @@ int main(int argn, char **argv) {
             error = GRBaddconstr(model, vertex_cliques[i].size(), vertex_cliques[i].data(), weights, GRB_GREATER_EQUAL, 1.0, NULL);
             if (error) {
                 cout << "Error in GRBaddconstr" << endl;
+                return 1;
                 //break;
             }
             // Free the memory taken by the dynamic arrays created above
             delete[] weights;
         }
 
-	double ilp_solver_setup_time = clique_timer.elapsed();
-	time_to_solution += ilp_solver_setup_time;
+        double ilp_solver_setup_time = clique_timer.elapsed();
+        time_to_solution += ilp_solver_setup_time;
 
-	timer ilp_solver_timer;
+        timer ilp_solver_timer;
 
         error = GRBoptimize(model);
-
         if (error) {
             cout << "Error in GRBoptimize" << endl;
+            return 1;
         }
 
         // Write out
         error = GRBwrite(model, "clique_gurobi.lp");
         if (error) {
             cout << "Error in GRBWrite" << endl;
+            return 1;
         }
 
         // Deallocate Memory
@@ -692,28 +752,119 @@ int main(int argn, char **argv) {
         double ilp_solver_time = ilp_solver_timer.elapsed();
         time_to_solution += ilp_solver_time;
 
+
+        // Unwinding reductions and transformations
+        double time_to_unwind = 0.0;
+
+        timer unwind_ilp_cliques_timer;
+
+        int numvars = 0;
+        error = GRBgetintattr(model, GRB_INT_ATTR_NUMVARS, &numvars);
+        if (error) {
+            cout << "Error in GRBgetintattr" << endl;
+            return 1;
+        }
+
+        /* Get the cliques in the VCC Cover */
+        vector<vector<int>> vcc_cliques;
+        for (int clique_id = 0; clique_id < numvars; clique_id++) {
+            double value = -1;
+            char* varname;
+            error = GRBgetdblattrelement(model, GRB_DBL_ATTR_X, clique_id, &value);
+            if (error) {
+                cout << "Error in GRBgetintattrelement" << endl;
+                return 1;
+            }
+
+////            error = GRBgetstrattrelement(model, GRB_STR_ATTR_VARNAME, clique_id, &varname);
+////            if (error) {
+////                cout << "Error in GRBgetstrattrelement" << endl;
+////                return 1;
+////            }
+////
+////            cout << varname << "=" << value << endl;
+
+            const double eps = 0.00001;
+            if (abs(value) <= eps) {
+                continue;
+            } else if (abs(value - 1) <= eps) {
+                vector<int> clique(clique_vertices[clique_id].begin(), clique_vertices[clique_id].end());
+
+////                bool found_invalid = false;
+////
+////                // verify clique in kernel
+////                for (size_t i = 0; !found_invalid && i < clique.size(); i++) {
+////                    for (size_t j = i + 1; !found_invalid && j < clique.size(); j++) {
+////                        node_t u = clique[i], v = clique[j];
+////                        if (find(reduVCC.kernel_adj_list[v].begin(), reduVCC.kernel_adj_list[v].end(), u) == reduVCC.kernel_adj_list[v].end() ||
+////                                find(reduVCC.kernel_adj_list[u].begin(), reduVCC.kernel_adj_list[u].end(), v) == reduVCC.kernel_adj_list[u].end()) {
+////                            cout << "ERROR: Kernel non-edge (u,v)=(" << u << "," << "v" << ") is in clique:";
+////                            for (node_t w : clique) {
+////                                cout << " " << w;
+////                            }
+////                            cout << endl;
+////                            found_invalid = true;
+////                        }
+////                    }
+////                }
+
+                vcc_cliques.emplace_back(clique);
+            } else {
+                // shouldn't happen
+                assert(0);
+            }
+        }
+
+        reduVCC.addKernelCliquesFixOverlapsSlow(vcc_cliques);
+
+        double time_to_unwind_ilp_cliques = unwind_ilp_cliques_timer.elapsed();
+        time_to_unwind += time_to_unwind_ilp_cliques;
+
+        // unwind VCC reductions
+        timer unwind_vcc_reductions_timer;
+        R.unwindReductions(reduVCC);
+        double time_to_unwind_vcc = unwind_vcc_reductions_timer.elapsed();
+        time_to_unwind += time_to_unwind_vcc;
+
+        // Unwind ECC to VCC transformation, by mapping VCC cliques back to ECC problem
+        timer unwind_ecc_to_vcc_timer;
+        vector<clique_t> const & vcc_cover = reduVCC.clique_cover;
+        converter.add_vcc_cliques_to_ecc_cover(vcc_cover, v_to_e_map);
+        double time_to_unwind_ecc_to_vcc = unwind_ecc_to_vcc_timer.elapsed();
+        time_to_unwind += time_to_unwind_ecc_to_vcc;
+
+        // total time 
+        double total_time = total_timer.elapsed();
+
+        // verifying ECC after timer is complete
+        bool const ecc_verified = cover.verify_cover(graph, true /* verbose */);
         std::cout << "BEGIN_OUTPUT_FOR_TABLES" << std::endl;
         std::cout << "run_type=" << partition_config.run_type << std::endl;
         //std::cout << "input_graph_vertices=" << G.number_of_nodes() << std::endl;
         //std::cout << "input_graph_edges=" << G.number_of_edges() / 2 << std::endl;
         //std::cout << "total_time_to_best=" << time_to_solution << std::endl;
         std::cout << "vcc_reduction_time=" << vcc_reduction_time << std::endl;
+        std::cout << "vcc_reduction_offset=" << to_string(R.get_cover_size_offset()) << std::endl;
         cout << "vcc_kernel_vertices=" << to_string(reduVCC.remaining_nodes) << endl;
         reduVCC.buildKernel();
         cout << "vcc_kernel_edges=" << to_string(reduVCC.kernel_edges / 2) << endl;
         std::cout << "clique_enumeration_time=" << clique_enumeration_time << std::endl;
         std::cout << "ilp_solver_setup_time=" << ilp_solver_setup_time << std::endl;
         std::cout << "ilp_solver_time=" << ilp_solver_time << std::endl;
-        std::cout << "total_time=" << total_timer.elapsed() << std::endl;
+        std::cout << "time_to_unwind_ilp_cliques=" << time_to_unwind_ilp_cliques << std::endl;
+        std::cout << "time_to_unwind_vcc_reductions=" << time_to_unwind_vcc << std::endl;
+        std::cout << "time_to_unwind_ecc_to_vcc=" << time_to_unwind_ecc_to_vcc << std::endl;
+        std::cout << "total_time=" << total_time << std::endl;
+        std::cout << "total_time_without_unwind=" << total_time - time_to_unwind << std::endl;
 
-	int grb_threads = 0;
+        int grb_threads = 0;
         error = GRBgetintparam(env, "Threads", &grb_threads);
         if (error) {
             cout << "Error getting threads in GRBgetintparam" << endl;
+            return 1;
         }
 
         std::cout << "ilp_solver_threads=" << to_string(grb_threads) << std::endl;
-        std::cout << "vcc_reduction_offset=" << to_string(R.get_cover_size_offset()) << std::endl;
         std::cout << "vcc_kernel_maximal_cliques=" << to_string(num_cliques) << std::endl;
         double primal_objval = 0;
         //double dual_objval = 0;
@@ -723,17 +874,33 @@ int main(int argn, char **argv) {
         // error = GRBgetstrattr(dual_model, EFTYPE, &vtype);
         long ilp_solution = primal_objval;
         cout << "ilp_solution_of_kernel=" << to_string(ilp_solution) << endl;
-        cout << "total_solution=" << to_string(cover.cliques.size() + R.get_cover_size_offset() + ilp_solution) << endl;
+        cout << "total_solution=" << to_string(cover.cliques.size()) << endl;
         //cout << "Objective Dual value of: " << dual_objval << endl;
         // cout << "Variable type: " << vtype << endl;
         //
         int status_of_ilp_solver = -1;
         error = GRBgetintattr(model, "Status", &status_of_ilp_solver);
 
-        std::cout << "optimal=" << (status_of_ilp_solver==GRB_OPTIMAL ? "yes" : "unknown") << endl;
+        make_graph_access(vcc_adjlist, G);
+
+        std::cout << "vcc_verified_cover=" << (reduVCC.validateCover(G) ? "passed" : "failed") << std::endl;
+        std::cout << "ecc_verified_cover=" << (ecc_verified ? "passed" : "failed") << std::endl;
+
+        std::cout << "solution_is_optimal=" << (status_of_ilp_solver==GRB_OPTIMAL ? "yes" : "unknown") << endl;
         if (status_of_ilp_solver != GRB_OPTIMAL) {
             std::cout << "ilp_solver_status=" << status_of_ilp_solver << std::endl;
         }
+
+        if (!partition_config.filename_output.empty()) {
+            if (status_of_ilp_solver != GRB_OPTIMAL) {
+                cout << "NOTE: Redu3ILP not finished, skipping writing to file " << partition_config.filename_output << endl;
+            } else if (!ecc_verified) {
+                cout << "NOTE: ECC not verified, skipping writing to file " << partition_config.filename_output << endl;
+            } else {
+                cover.write_cover(graph, partition_config.filename_output);
+            }
+        }
+
         return 0;
     }
 #ifdef BETA

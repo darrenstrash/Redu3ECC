@@ -2,7 +2,12 @@
 #include <utility>
 #include <vector>
 #include <cstddef>
+#include <iostream>
+#include <fstream>
+#include <algorithm> // for sort
+
 using std::size_t;
+using namespace std;
 
 // for hashing
 #include <boost/functional/hash.hpp>
@@ -10,17 +15,6 @@ using std::size_t;
 #include "cover.hpp"
 #include "graph.hpp"
 #include "adjacency_list.hpp"
-
-size_t NodePairHash::operator()(std::pair<uint32_t, uint32_t> const& p) const {
-    // Ensure that size_t, the type of the hash, is large enough
-    // assert(sizeof(size_t) >= sizeof(uint32_t) * 2); // It usually is
-    //return (((size_t)p.first) << sizeof(uint32_t)) | (size_t)p.second;
-    //DS: a real hash function
-    size_t seed = 0;
-    boost::hash_combine(seed, std::get<0>(p));
-    boost::hash_combine(seed, std::get<1>(p));
-    return seed;
-}
 
 Cover::Cover() {
     num_components = 0;
@@ -85,12 +79,12 @@ void Cover::shadow_node(node_t target, node_t shadow) {
 }
 
 void Cover::cover_clique(node_container_t const& clique) {
-    // bool is_new_clique = false;
+    bool is_new_clique = false;
     std::vector<node_t> to_add;
     for (auto it1 = clique.cbegin(); it1 != clique.cend(); it1++) {
         for (auto it2 = std::next(it1, 1); it2 != clique.cend(); it2++) {
             if (not is_covered(*it1, *it2)) {
-                // is_new_clique = true;
+                is_new_clique = true;
                 cover_edge(*it1, *it2);
             }
             if (shadows.contains(*it1)) {
@@ -99,6 +93,8 @@ void Cover::cover_clique(node_container_t const& clique) {
             }
         }
     }
+
+    assert(is_new_clique);
 
     for (size_t i = 0; i < to_add.size(); i++) {
         if (shadows.contains(to_add[i])) { // If the things we just added have shadows,
@@ -122,4 +118,112 @@ bool Cover::is_removed(node_t v) const {
 
 size_t Cover::num_covered_edges() const {
     return covered_edges.size() / 2;
+}
+
+bool Cover::verify_cover(ECCGraph const & graph, bool const verbose) const {
+    bool verified = true;
+    // for each edge in graph, check that it is covered
+    edgeset_t all_edges;
+    for (auto u : graph.vertices) {
+        for (auto v : graph.neighbors(u)) {
+            edge_t edge = make_pair(u,v);
+            all_edges.insert(edge);
+            if (covered_edges.find(edge) == covered_edges.end()) {
+                if (verbose) {
+                    cout << "VERIFY: FAILED" << endl;
+                    cout << "VERIFY: Did not cover edge (" << graph.to_original_id[u] << "," << graph.to_original_id[v] << ")" << endl;
+                    verified = false;
+                    cout << "NOTE: more errors possible, exiting after first failed check." << endl;
+                }
+                return false;
+            }
+        }
+    }
+    for (auto edge : covered_edges) {
+        if (all_edges.find(edge) == all_edges.end()) {
+            if (verbose) {
+                    cout << "VERIFY: FAILED" << endl;
+                    cout << "VERIFY: Consistency issue detected" << endl;
+                    cout << "VERIFY: Non-edge (" << graph.to_original_id[get<0>(edge)] << "," << graph.to_original_id[get<1>(edge)] << ") is marked as covered." << endl;
+                    verified = false;
+                    cout << "NOTE: more errors possible, exiting after first failed check." << endl;
+                    return false;
+            }
+        }
+    }
+
+    edgeset_t covered_edges2;
+
+    for (auto const & clique : cliques) {
+        for (size_t i = 0; i < clique.size(); i++) {
+            for (size_t j = i + 1; j < clique.size(); j++) {
+                edge_t edge = make_pair(clique[i], clique[j]);
+                if (all_edges.find(edge) == all_edges.end()) {
+                    if (verbose) {
+                        cout << "VERIFY: FAILED" << endl;
+                        cout << "VERIFY: Cover contains non-clique";
+                        for (auto u : clique) {
+                            cout << " " << graph.to_original_id[u];
+                        }
+                        cout << endl;
+                        cout << "VERIFY: (" << graph.to_original_id[clique[i]] << "," << graph.to_original_id[clique[j]] << ") is not an edge"  << endl;
+                        cout << "NOTE: more errors possible, exiting after first failed check." << endl;
+                    }
+                    return false;
+                }
+
+                if (covered_edges.find(edge) == covered_edges.end()) {
+                    if (verbose) {
+                        cout << "VERIFY: FAILED" << endl;
+                        cout << "VERIFY: Consistency issue detected" << endl;
+                        cout << "VERIFY: (" << graph.to_original_id[clique[i]] << "," << graph.to_original_id[clique[j]] << ") is not marked covered"  << endl;
+                        cout << "VERIFY: but is in clique";
+                        for (auto u : clique) {
+                            cout << " " << graph.to_original_id[u];
+                        }
+                        cout << endl;
+                        cout << "NOTE: more errors possible, exiting after first failed check." << endl;
+                    }
+                    return false;
+                }
+                covered_edges2.insert(edge);
+                covered_edges2.insert(make_pair(get<1>(edge), get<0>(edge)));
+            }
+        }
+    }
+    if (covered_edges.size() != covered_edges2.size()) {
+        if (verbose) {
+            cout << "VERIFY: FAILED" << endl;
+            cout << "VERIFY: Consistency issue detected" << endl;
+            cout << "VERIFY: " << covered_edges.size() << " edges (and their reverses) are marked as covered" << endl;
+            cout << "VERIFY: But " << covered_edges2.size() << " edges (and their reverses) are actually covered by cliques..." << endl;
+            cout << "NOTE: more errors possible, exiting after first failed check." << endl;
+        }
+        return false;
+    }
+
+    // for each covered edge / clique, check that its edge existed in the graph.
+    return true;
+}
+
+void Cover::write_cover(ECCGraph const &graph, string const &filename) {
+    std::ofstream f(filename.c_str());
+    std::cout << "NOTE: Writing cover to " << filename << " ... " << std::endl;
+
+    clique_t original_clique;
+    for (auto const & clique : cliques) {
+        assert(!clique.empty());
+        original_clique.clear();
+        original_clique.reserve(clique.size());
+        for (node_t v : clique) {
+            original_clique.push_back(graph.to_original_id[v]);
+        }
+        sort(original_clique.begin(), original_clique.end());
+        f << original_clique[0];
+        for (size_t i = 1; i < original_clique.size(); i++) {
+            f << " " << original_clique[i];
+        }
+        f << endl;
+    }
+    f.close();
 }

@@ -121,6 +121,8 @@ void d2_reduction::unfold( redu_vcc &reduVCC) {
   }
   for (NodeID a : N_u) {scratch1[a] = false;}
 
+////  std::cout << "DG2: Unfold x=" << x << ",y=" << y << std::endl;
+////  std::cout << "Replace: "; reduVCC.printVectorSet(fold_clique); std::cout << std::endl;
 
   for (unsigned int i = 0; i < fold_clique.size(); i++){
       if (fold_clique[i] == w){
@@ -131,9 +133,11 @@ void d2_reduction::unfold( redu_vcc &reduVCC) {
       }
   }
   reduVCC.replaceClique(fold_cliqueID, fold_clique);
+////  std::cout << "   with: "; reduVCC.printVectorSet(fold_clique); std::cout << std::endl;
 
   std::vector<NodeID> new_clique {v, y};
   reduVCC.addCliqueToCover(new_clique);
+////  std::cout << "   add: "; reduVCC.printVectorSet(new_clique); std::cout << std::endl;
 }
 
 void d2_reduction::unreduce( redu_vcc &reduVCC){

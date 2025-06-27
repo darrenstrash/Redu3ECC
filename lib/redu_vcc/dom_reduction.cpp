@@ -83,6 +83,7 @@ void dom_reduction::reduce(  redu_vcc &reduVCC, vertex_queue *queue,
 
 void dom_reduction::unfold( redu_vcc &reduVCC){
 
+////  std::cout << "DOM: Unfold u=" << u << ",v=" << v << std::endl;
   std::vector<std::vector<NodeID>> &adj_list = reduVCC.adj_list;
   std::vector<bool> &scratch1 = reduVCC.scratch1;
 
@@ -90,7 +91,11 @@ void dom_reduction::unfold( redu_vcc &reduVCC){
   unsigned int fold_cliqueID = reduVCC.solve_node_clique[u];
   std::vector<NodeID> fold_clique = reduVCC.clique_cover[fold_cliqueID];
 
+////  std::cout << "Replace: "; reduVCC.printVectorSet(fold_clique); std::cout << std::endl;
+
+
   fold_clique.push_back(v);
+////  std::cout << "   with: "; reduVCC.printVectorSet(fold_clique); std::cout << std::endl;
   reduVCC.replaceClique(fold_cliqueID, fold_clique);
 }
 

@@ -43,7 +43,7 @@ def GetEnvironment():
     print('Illegal value for variant: %s' % env['variant'])
     sys.exit(1)
 
-  if not env['program'] in ['kaffpa', 'kaffpaE', 'partition_to_vertex_separator','improve_vertex_separator','library','graphchecker','label_propagation','evaluator','node_separator','spac', 'redu3ecc']:
+  if not env['program'] in ['kaffpa', 'kaffpaE', 'partition_to_vertex_separator','improve_vertex_separator','library','checker','label_propagation','evaluator','node_separator','spac', 'redu3ecc']:
     print('Illegal value for program: %s' % env['program'])
     sys.exit(1)
 
@@ -121,7 +121,7 @@ else:
           env.Append(CCFLAGS  = '-O3  -DNDEBUG -DKAFFPAOUTPUT -fpermissive')
         else:
           env.Append(CXXFLAGS = ' -g -DDEBUG -Wall -funroll-loops -O0 -std=c++20 -fpermissive')
-          env.Append(CCFLAGS  = ' -g -O0  -DNDEBUG -funroll-loops -fpermissive')
+          env.Append(CCFLAGS  = ' -g -O0  -DDEBUG -funroll-loops -fpermissive')
           if SYSTEM != 'Darwin':
                 env.Append(CXXFLAGS = '-march=native')
                 env.Append(CCFLAGS  = '-march=native')
